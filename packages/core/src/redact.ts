@@ -5,7 +5,57 @@
 
 const JWT_RE = /\beyJ[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]{5,}\.?[A-Za-z0-9_-]*/g
 const BEARER_RE = /\bBearer\s+[A-Za-z0-9._~+/=-]+/gi
-const KEY_VALUE_RE = /\b(token|secret|password|passwd|pwd|api[_-]?key|access[_-]?key|authorization|auth|session|sid)=([^&\s]+)/gi
+
+// --- chave/valor ---------------------------------------------------------------------------------
+// Nomes sensíveis casados como SUFIXO (access_token, client_secret, dbPassword) ou como nome exato.
+const NAME_SUFFIX = 'token|secret|password|passwd|pwd|api[_-]?key|apikey|access[_-]?key|private[_-]?key|credentials?'
+const NAME_EXACT = 'authorization|auth|session|session[_-]?id|sessionid|sid|cookie|set-cookie'
+const NAME = `(?<![A-Za-z0-9])((?:[A-Za-z0-9_.-]*(?:${NAME_SUFFIX})|${NAME_EXACT}))`
+const QUOTE = '(?:\\\\?["\'])'
+// valor: entre aspas (inclusive escapadas, de JSON dentro de string) ou até espaço, & , ; aspas ou }
+const VAL_QUOTED = '"(?:[^"\\\\]|\\\\.)*"|\'[^\']*\'|\\\\"[^"\\\\]*\\\\"'
+const SCHEME = '(?:Basic|Bearer|Digest|Negotiate|Token)'
+const VAL_BARE = `(?!${SCHEME}[ \\t])[^\\s&,;"'}]+`
+const EQ_RE = new RegExp(`${NAME}(${QUOTE}?[ \\t]*=[ \\t]*)(${VAL_QUOTED}|${VAL_BARE})`, 'gi')
+const COLON_RE = new RegExp(`${NAME}(${QUOTE}?[ \\t]*:[ \\t]*)(${VAL_QUOTED}|${VAL_BARE})`, 'gi')
+const JSON_RE = new RegExp(`${NAME}(${QUOTE}[ \\t]*:[ \\t]*)(${VAL_QUOTED})`, 'gi')
+// `Authorization: <esquema> <valor>`: mantém o esquema, redige o valor
+const AUTH_HDR_RE = new RegExp(
+  `(?<![A-Za-z0-9])((?:proxy-)?authorization)(${QUOTE}?[ \\t]*[:=][ \\t]*)(?!(?:${SCHEME}[ \\t]+)?\\[redacted\\])(${SCHEME}[ \\t]+)?[^\\s&,;"'}]+`,
+  'gi',
+)
+// `code` (OAuth) só onde `comment` não chega: console e query string
+const CODE_RE = new RegExp(`(?<![A-Za-z0-9_.-])(code)(${QUOTE}?[ \\t]*[=:][ \\t]*)(${VAL_QUOTED}|${VAL_BARE})`, 'gi')
+const QUERY_CODE_RE = /([?&]code=)[^&\s#]+/gi
+const URL_CREDS_RE = /\b([a-z][a-z0-9+.-]*:\/\/)[^\s/@:?#]+:[^\s/@]+@/gi
+const KNOWN_KEY_RE =
+  /\b(?:sk-[A-Za-z0-9_-]{8,}|gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|xox[abprs]-[A-Za-z0-9-]{8,}|AKIA[0-9A-Z]{16}|AIza[0-9A-Za-z_-]{30,})/g
+const CARD_RE = /(?<!\d)\d(?:[ -]?\d){12,18}(?!\d)/g
+
+const hideValue = (v: string): string =>
+  v.startsWith('\\"') ? '\\"[redacted]\\"' : v.startsWith('"') ? '"[redacted]"' : v.startsWith("'") ? "'[redacted]'" : '[redacted]'
+const kv = (_m: string, name: string, sep: string, val: string) => `${name}${sep}${hideValue(val)}`
+
+function luhn(digits: string): boolean {
+  let sum = 0
+  for (let i = 0; i < digits.length; i++) {
+    let d = digits.charCodeAt(digits.length - 1 - i) - 48
+    if (i % 2 === 1) {
+      d *= 2
+      if (d > 9) d -= 9
+    }
+    sum += d
+  }
+  return sum % 10 === 0
+}
+
+function redactCards(s: string): string {
+  return s.replace(CARD_RE, (m) => {
+    const digits = m.replace(/\D/g, '')
+    return digits.length >= 13 && digits.length <= 19 && luhn(digits) ? '[card]' : m
+  })
+}
+
 const HEX_RE = /\b[0-9a-fA-F]{32,}\b/g
 // sequência longa com letras e dígitos (base64url, chaves de API)
 const LONG_TOKEN_RE = /(?=[A-Za-z0-9_-]*\d)(?=[A-Za-z0-9_-]*[A-Za-z])[A-Za-z0-9_-]{32,}/g
@@ -26,19 +76,41 @@ export function fixpoint(s: string, fn: (x: string) => string): string {
   return cur
 }
 
-/** Só segredos (JWT, Bearer, chave=valor, hex/base64 longos). Usada também no `comment`. */
-export function redactSecrets(s: string): string {
-  return s
+type Mode = 'comment' | 'text' | 'console'
+
+function scrub(s: string, mode: Mode): string {
+  let out = s
     .replace(JWT_RE, '[jwt]')
+    .replace(AUTH_HDR_RE, (_m, name: string, sep: string, scheme?: string) => `${name}${sep}${scheme ?? ''}[redacted]`)
     .replace(BEARER_RE, 'Bearer [redacted]')
-    .replace(KEY_VALUE_RE, '$1=[redacted]')
+    .replace(URL_CREDS_RE, '$1[redacted]@')
+    .replace(EQ_RE, kv)
+    .replace(JSON_RE, kv)
+  if (mode !== 'comment') out = out.replace(COLON_RE, kv).replace(QUERY_CODE_RE, '$1[redacted]')
+  if (mode === 'console') out = out.replace(CODE_RE, kv)
+  return redactCards(out.replace(KNOWN_KEY_RE, '[token]'))
     .replace(HEX_RE, '[token]')
     .replace(LONG_TOKEN_RE, '[token]')
 }
 
-/** Segredos + e-mail. Para url, route, title, text, selector e erros do console. */
+/**
+ * Só segredos, para o `comment`: JWT, Bearer, `Authorization: <esquema> <valor>`, `chave=valor` e JSON entre aspas,
+ * credenciais em URL, chaves conhecidas, cartão (Luhn), hex e sequências longas.
+ * Não casa `chave: valor` solto nem `code` ("senha: obrigatória" e "code=200" são texto comum).
+ * É melhor esforço: não garante que nenhum segredo passe.
+ */
+export function redactSecrets(s: string): string {
+  return scrub(s, 'comment')
+}
+
+/** Segredos (inclui `chave: valor` e `?code=`) + e-mail. Para url, route, title, text e selector. */
 export function redact(s: string): string {
-  return redactSecrets(s).replace(EMAIL_RE, '[email]')
+  return scrub(s, 'text').replace(EMAIL_RE, '[email]')
+}
+
+/** Como `redact`, e também `code=`/`code:` (OAuth). Para as mensagens do console. */
+export function redactConsole(s: string): string {
+  return scrub(s, 'console').replace(EMAIL_RE, '[email]')
 }
 
 /** Remove marcadores que poderiam forjar o rodapé do Markdown ou fechar comentário HTML. */
