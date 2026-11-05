@@ -14,6 +14,8 @@ A floating button that lets you point at an element of the UI, write a comment a
 Attributes of `<feedback-layer>`: `project`, `project-version`, `project-commit`, `from`, `to`, `bridge`,
 `shortcut` (default `Alt+Shift+F`), `no-safe-area`, `start-hidden`, `isolate-tokens`.
 
+Vue plugin: if a `<feedback-layer>` already exists on the page, the plugin reuses it and its options are ignored.
+
 API: `el.show()`, `el.hide()`. Events: `feedback-sent`, `feedback-copied`.
 
 ## Delivery
