@@ -6,6 +6,15 @@ import { installConsoleCapture } from './capture.js'
 
 export { FeedbackLayerElement, register }
 export * from './note.js'
+
+/** API global do script standalone: FeedbackLayer.show() / FeedbackLayer.hide(). */
+export function show(): void {
+  document.querySelector<FeedbackLayerElement>(TAG)?.show()
+}
+export function hide(): void {
+  document.querySelector<FeedbackLayerElement>(TAG)?.hide()
+}
+
 export { httpTransport, clipboardTransport } from './transport.js'
 
 export interface MountOptions {

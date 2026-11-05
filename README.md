@@ -28,3 +28,10 @@ Bridge endpoints: `GET /health`, `POST /notes` (max 64 KB, 409 on duplicate id, 
 npm install && npm run build && npm test && npm run e2e
 ```
 See `AGENTS.md` for rules.
+
+## Limitacoes (v1)
+- Sequencias hexadecimais com 32 ou mais caracteres em comment ou texto viram [token] (redacao de segredos). Isso tambem atinge SHA de commit (40) e pubkey (64).
+- O bridge responde 400 se comment ou target.text trouxerem controle ou bidi. O cliente sanitiza antes de enviar, entao o uso normal nao e afetado.
+- O e2e roda so no Edge (Playwright, channel msedge).
+- Dev-only: npm audit acusa vulnerabilidades na cadeia do vitest 3.x. Atualizar para vitest 5 fica para depois da v1.
+
