@@ -39,6 +39,7 @@ See `AGENTS.md` for rules.
 - O `inbox/` e a entrega da v1. O bridge nao posta no Buzz e nenhuma chave entra no repo. A entrega automatica no Buzz fica para depois (ver "Fora da v1").
 - O bridge exige Content-Type application/json (415 nos demais).
 - O bridge responde 400 se comment ou target.text trouxerem controle ou bidi. O cliente sanitiza antes de enviar, entao o uso normal nao e afetado.
+- O `Esc` do popover so e ouvido no host do layer. Com o foco fora dele (depois de Tab para a pagina), o popover continua aberto e se fecha pelo X (coerente com `aria-modal=false`). Durante a selecao de elemento o `Esc` e global.
 - O e2e roda so no Edge (Playwright, channel msedge).
 - Dev-only: npm audit acusa vulnerabilidades na cadeia do vitest 3.x. Atualizar para vitest 5 fica para depois da v1.
 
