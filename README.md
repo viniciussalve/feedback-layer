@@ -31,6 +31,8 @@ See `AGENTS.md` for rules.
 
 ## Limitacoes (v1)
 - Sequencias hexadecimais com 32 ou mais caracteres em comment ou texto viram [token] (redacao de segredos). Isso tambem atinge SHA de commit (40) e pubkey (64).
+- **A redação de segredos é de melhor esforço e não garante nada.** Cobre JWT, Bearer, Authorization, chave=valor, JSON entre aspas, credenciais em URL, chaves conhecidas (sk-, ghp_, xox, AKIA), cartão (só com Luhn válido), hex e sequências longas. No comment, só = e JSON entre aspas; dois-pontos solto e code= são texto comum. Revise o que vai ser enviado na prévia.
+- O bridge exige Content-Type application/json (415 nos demais).
 - O bridge responde 400 se comment ou target.text trouxerem controle ou bidi. O cliente sanitiza antes de enviar, entao o uso normal nao e afetado.
 - O e2e roda so no Edge (Playwright, channel msedge).
 - Dev-only: npm audit acusa vulnerabilidades na cadeia do vitest 3.x. Atualizar para vitest 5 fica para depois da v1.
