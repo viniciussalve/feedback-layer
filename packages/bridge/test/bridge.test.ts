@@ -145,6 +145,23 @@ describe('bridge: caminho feliz', () => {
   })
 })
 
+describe('bridge: Content-Type', () => {
+  it('text/plain, form e ausente dão 415 e não gravam', async () => {
+    await start()
+    for (const ct of ['text/plain', 'application/x-www-form-urlencoded', 'multipart/form-data', 'application/jsonx', '']) {
+      const r = await post(makeNote(), { Origin: ORIGIN, 'Content-Type': ct })
+      expect(r.status, `Content-Type "${ct}"`).toBe(415)
+    }
+    expect(await files()).toEqual([])
+  })
+
+  it('application/json com charset e caixa mista é aceito', async () => {
+    await start()
+    const r = await post(makeNote(), { Origin: ORIGIN, 'Content-Type': 'Application/JSON; charset=UTF-8' })
+    expect(r.status).toBe(201)
+  })
+})
+
 describe('bridge: Host e Origin', () => {
   it('recusa Host não local (DNS rebinding)', async () => {
     await start()

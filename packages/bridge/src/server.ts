@@ -144,7 +144,14 @@ export function createBridge(opts: BridgeOptions): Server {
     }
     if (req.method !== 'POST') return send(res, 405, { error: 'método não permitido' }, { ...cors, Allow: 'POST, OPTIONS' })
 
-    // 3. corpo
+    // 3. Content-Type: só application/json (text/plain não exige preflight de CORS)
+    const ctype = String(req.headers['content-type'] ?? '').split(';')[0].trim().toLowerCase()
+    if (ctype !== 'application/json') {
+      req.resume()
+      return send(res, 415, { error: 'Content-Type deve ser application/json' }, cors)
+    }
+
+    // 3b. corpo
     let body: string
     try {
       body = await readBody(req, maxBody)

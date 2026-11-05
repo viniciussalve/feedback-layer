@@ -1,8 +1,8 @@
 import {
-  fixpoint, maskCssUrls, maskRoute, multiLine, oneLine, redact, redactSecrets, stripMarkers, stripQueryHash, truncate,
+  fixpoint, maskCssUrls, maskRoute, multiLine, oneLine, redact, redactConsole, redactSecrets, stripMarkers, stripQueryHash, truncate,
 } from './redact.js'
 import {
-  LIMITS, SCHEMA_ID, STYLE_KEYS, THEMES,
+  LIMITS, SCHEMA_ID, STYLE_KEYS, THEMES, UUID_V4_RE,
   type FeedbackNote, type FeedbackTarget, type StyleKey, type Theme,
 } from './schema.js'
 
@@ -20,8 +20,8 @@ const line = (v: unknown, max: number) =>
   fixpoint(s(v), (x) => truncate(stripMarkers(oneLine(x)), max).trim())
 
 /** Uma linha com redação completa: url, route, title, text, selector, erros. */
-const redLine = (v: unknown, max: number, pre: (x: string) => string = (x) => x) =>
-  fixpoint(s(v), (x) => truncate(stripMarkers(redact(pre(oneLine(x)))), max).trim())
+const redLine = (v: unknown, max: number, pre: (x: string) => string = (x) => x, red = redact) =>
+  fixpoint(s(v), (x) => truncate(stripMarkers(red(pre(oneLine(x)))), max).trim())
 
 const style = (v: unknown) =>
   fixpoint(s(v), (x) => truncate(stripMarkers(maskCssUrls(oneLine(x))), LIMITS.style).trim())
@@ -64,7 +64,9 @@ function sanitizeTarget(t: FeedbackTarget): FeedbackTarget {
   return out
 }
 
+/** Lança se `id` não for UUID v4: o id vai para o rodapé do Markdown e para o nome do arquivo, nunca é limpo em silêncio. */
 export function sanitizeNote(note: FeedbackNote): FeedbackNote {
+  if (typeof note?.id !== 'string' || !UUID_V4_RE.test(note.id)) throw new TypeError('sanitizeNote: id deve ser UUID v4')
   const project: FeedbackNote['project'] = { name: line(note.project?.name, LIMITS.short) }
   opt(project, 'version', line(note.project?.version, LIMITS.short))
   opt(project, 'commit', line(note.project?.commit, LIMITS.short))
@@ -94,7 +96,7 @@ export function sanitizeNote(note: FeedbackNote): FeedbackNote {
     },
     consoleErrors: (Array.isArray(note.consoleErrors) ? note.consoleErrors : [])
       .slice(-LIMITS.consoleErrors)
-      .map((e) => ({ ts: s(e?.ts), message: redLine(e?.message, LIMITS.consoleMessage) }))
+      .map((e) => ({ ts: s(e?.ts), message: redLine(e?.message, LIMITS.consoleMessage, undefined, redactConsole) }))
       .filter((e) => e.message !== ''),
   }
   // chaves opcionais no fim, em ordem estável

@@ -5,6 +5,22 @@ import { makeNote } from './fixtures.js'
 
 const JWT = 'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c'
 
+describe('sanitizeNote e toMarkdown: id', () => {
+  it('só aceitam UUID v4; os outros casos lançam erro', async () => {
+    const { sanitizeNote } = await import('../src/sanitize.js')
+    const { toMarkdown } = await import('../src/markdown.js')
+    const { makeNote } = await import('./fixtures.js')
+    const ok = makeNote()
+    expect(() => sanitizeNote(ok)).not.toThrow()
+    for (const id of ['--> <script>alert(1)</script>', '../../etc/passwd', '', 'not-a-uuid', '00000000-0000-1000-8000-000000000000']) {
+      const bad = { ...ok, id }
+      expect(() => sanitizeNote(bad), id).toThrow(/UUID/)
+      expect(() => toMarkdown(bad), id).toThrow(/UUID/)
+    }
+    expect(() => sanitizeNote({ ...ok, id: 42 as unknown as string })).toThrow(/UUID/)
+  })
+})
+
 describe('redact', () => {
   it('remove e-mail, JWT, Bearer, chave=valor e sequências longas', () => {
     expect(redact('fale com ana@exemplo.com.br')).toBe('fale com [email]')
