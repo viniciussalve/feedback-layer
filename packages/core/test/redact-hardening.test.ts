@@ -56,6 +56,29 @@ describe('custo da redação não cresce com a entrada', () => {
   })
 })
 
+describe('borda do corte de 2x antes da redacao', () => {
+  // Cada token de 40 caracteres vira "[token]" (7): a redacao encurta o texto bem abaixo do maximo,
+  // entao um pedaco do segredo que cruza a borda do corte (2x = 400) sobraria na nota.
+  const filler = ('a1'.repeat(20) + ' ').repeat(9) // 369 caracteres
+  const secret = 'q7'.repeat(20) // 40 caracteres, comeca em 369 e cruza a borda em 400
+
+  it('um segredo de 40 caracteres que cruza a borda nao deixa prefixo em target.text', () => {
+    const base = makeNote()
+    const out = sanitizeNote({ ...base, target: { ...base.target!, text: filler + secret + ' fim' } })
+    expect(out.target!.text).not.toContain('q7')
+    expect(out.target!.text).toContain('[token]')
+    expect(sanitizeNote(out)).toEqual(out)
+  })
+
+  it('o mesmo vale para comment: token de 40 caracteres que cruza o corte de 4000', () => {
+    const base = makeNote()
+    const lead = ('a1'.repeat(20) + ' ').repeat(97) // 3977 caracteres; o segredo comeca ali e cruza 4000
+    const out = sanitizeNote({ ...base, comment: lead + secret + ' fim' })
+    expect(out.comment).not.toContain('q7')
+    expect(out.comment).toContain('[token]')
+  })
+})
+
 describe('nomes em português e chaves Stripe', () => {
   it('senha, segredo, pass e chave', () => {
     for (const fn of [redactSecrets, redact, redactConsole]) {

@@ -15,8 +15,16 @@ import {
 
 const s = (v: unknown): string => (typeof v === 'string' ? v : '')
 
+const CUT_MARGIN = 64
+
 /** Entrada limitada a 2x o máximo antes de qualquer regex: o custo da redação não cresce com o tamanho da entrada. */
-const capped = (v: unknown, max: number): string => truncate(s(v), max * 2)
+const capped = (v: unknown, max: number): string => {
+  const x = s(v)
+  const cap = max * 2
+  // Se houve corte, descarta os ultimos CUT_MARGIN caracteres: um segredo cortado ao meio nao deixa prefixo
+  // (um prefixo curto demais para a redacao reconhecer) caso a redacao encurte o texto abaixo do maximo.
+  return x.length > cap ? truncate(x, cap - CUT_MARGIN) : x
+}
 
 /** Uma linha, sem redação de e-mail: from, to, project.*, vue.*. */
 const line = (v: unknown, max: number) =>
