@@ -74,6 +74,9 @@ svg.sm { width: ${v('icon-sm')}; height: ${v('icon-sm')}; }
   box-shadow: 0 0 0 ${v('ring')} ${v('bg')}; font-size: ${v('t-caption')}; text-align: center;
 }
 
+/* Região viva sempre no DOM (leitores de tela anunciam só o texto trocado): vazia, não ocupa espaço nem aparece. */
+.hint:empty { padding: 0; border: 0; box-shadow: none; max-width: 0; overflow: hidden; }
+
 /* ---------- realce do alvo (sem overlay: não bloqueia rolagem) ---------- */
 .hl {
   position: fixed; left: calc(var(--fl-hx) * ${v('unit')}); top: calc(var(--fl-hy) * ${v('unit')});

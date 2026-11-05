@@ -119,7 +119,25 @@ describe('<feedback-layer>', () => {
     expect(q('.toolbar').getAttribute('role')).toBe('toolbar')
     q<HTMLButtonElement>('[data-act="pick"]').click()
     expect(q('[data-act="pick"]').getAttribute('aria-pressed')).toBe('true')
-    expect(q('.hint').hidden).toBe(false)
+    expect(q('.hint').textContent).toBe('Elemento: clique num item da tela, ou use Tab e Enter. Esc cancela.')
+  })
+
+  it('a região viva .hint fica sempre no DOM, sem hidden; só o texto muda', () => {
+    mountLayer()
+    const hint = q('.hint')
+    expect(hint.getAttribute('role')).toBe('status')
+    expect(hint.hasAttribute('hidden')).toBe(false)
+    expect(hint.textContent).toBe('')
+    q<HTMLButtonElement>('.fab').click()
+    q<HTMLButtonElement>('[data-act="pick"]').click()
+    expect(q('.hint')).toBe(hint) // mesmo nó
+    expect(hint.hasAttribute('hidden')).toBe(false)
+    expect(hint.textContent).not.toBe('')
+    sh().host.dispatchEvent(new Event('x')) // sem efeito; garante que o host continua montado
+    ;(window as Window).dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))
+    expect(q('.hint')).toBe(hint)
+    expect(hint.hasAttribute('hidden')).toBe(false)
+    expect(hint.textContent).toBe('')
   })
 
   it('seleção: o clique no item não chega ao app, abre o popover com alvo e foco no comentário', () => {

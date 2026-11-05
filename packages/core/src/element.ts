@@ -58,7 +58,7 @@ const TEMPLATE = `
     <div class="toolbar" id="toolbar" role="toolbar" aria-label="${M.toolbar}" hidden>
       <button type="button" class="tbtn" data-act="pick" aria-pressed="false" aria-label="${M.toolElement}" title="${M.toolElement}">${svg('pick')}</button>
     </div>
-    <div class="hint" role="status" hidden></div>
+    <div class="hint" role="status"></div>
   </div>
   <div class="popover" role="dialog" aria-modal="false" aria-labelledby="pt" hidden>
     <form novalidate data-view="form">
@@ -254,7 +254,6 @@ export class FeedbackLayerElement extends HTMLElement {
     this.hover = null
     this.pickBtn.setAttribute('aria-pressed', 'true')
     this.hint.textContent = M.hintElement
-    this.hint.hidden = false
     const on = (type: string, fn: (e: never) => void, opts: AddEventListenerOptions = { capture: true }) => {
       window.addEventListener(type, fn as EventListener, opts)
       this.pickCleanups.push(() => window.removeEventListener(type, fn as EventListener, opts))
@@ -277,7 +276,6 @@ export class FeedbackLayerElement extends HTMLElement {
     this.hover = null
     this.hl.hidden = true
     this.chip.hidden = true
-    this.hint.hidden = true
     this.hint.textContent = ''
     this.pickBtn.setAttribute('aria-pressed', 'false')
     if (focusTool) this.pickBtn.focus({ preventScroll: true })
