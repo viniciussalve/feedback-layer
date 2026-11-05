@@ -52,6 +52,7 @@ function send(res: ServerResponse, status: number, body: unknown, headers: Recor
 }
 
 class TooLarge extends Error {}
+const DRAIN_LIMIT = 1024 * 1024
 
 function readBody(req: IncomingMessage, max: number): Promise<string> {
   return new Promise((resolveBody, reject) => {
@@ -59,10 +60,15 @@ function readBody(req: IncomingMessage, max: number): Promise<string> {
     if (Number.isFinite(declared) && declared > max) return reject(new TooLarge())
     const chunks: Buffer[] = []
     let size = 0
+    let rejected = false
     req.on('data', (c: Buffer) => {
       size += c.length
       if (size > max) {
-        reject(new TooLarge())
+        if (!rejected) {
+          rejected = true
+          reject(new TooLarge())
+        }
+        if (size > max + DRAIN_LIMIT) req.destroy() // descarta o resto (com teto) para o cliente receber o 413
         return
       }
       chunks.push(c)
@@ -78,6 +84,7 @@ export function createBridge(opts: BridgeOptions): Server {
   const allowNoOrigin = opts.allowNoOrigin ?? true
   const maxBody = opts.maxBodyBytes ?? LIMITS.bodyBytes
   const now = opts.now ?? (() => new Date())
+  const inflight = new Set<string>()
 
   async function exists(id: string): Promise<boolean> {
     const id8 = id.slice(0, 8).toLowerCase()
@@ -143,9 +150,7 @@ export function createBridge(opts: BridgeOptions): Server {
       body = await readBody(req, maxBody)
     } catch (e) {
       if (e instanceof TooLarge) {
-        send(res, 413, { error: `corpo acima de ${maxBody} bytes` }, { ...cors, Connection: 'close' })
-        req.destroy()
-        return
+        return send(res, 413, { error: `corpo acima de ${maxBody} bytes` }, { ...cors, Connection: 'close' })
       }
       return send(res, 400, { error: 'corpo ilegível' }, cors)
     }
@@ -163,12 +168,19 @@ export function createBridge(opts: BridgeOptions): Server {
 
     // 5. grava em inbox/
     await mkdir(inbox, { recursive: true })
-    if (await exists(note.id)) return send(res, 409, { error: 'id repetido' }, cors)
-    const stamp = now().toISOString().replace(/[:.]/g, '')
-    const base = `${stamp}_${note.id.slice(0, 8).toLowerCase()}`
-    await atomicWrite(`${base}.json`, toJSON(note))
-    await atomicWrite(`${base}.md`, toMarkdown(note))
-    send(res, 201, { ok: true, id: note.id, file: `${base}.md` }, cors)
+    const key = note.id.toLowerCase()
+    if (inflight.has(key)) return send(res, 409, { error: 'id repetido' }, cors)
+    inflight.add(key) // síncrono, antes de qualquer await: dois POSTs simultâneos com o mesmo id, só o primeiro grava
+    try {
+      if (await exists(note.id)) return send(res, 409, { error: 'id repetido' }, cors)
+      const stamp = now().toISOString().replace(/[:.]/g, '')
+      const base = `${stamp}_${note.id.slice(0, 8).toLowerCase()}`
+      await atomicWrite(`${base}.json`, toJSON(note))
+      await atomicWrite(`${base}.md`, toMarkdown(note))
+      send(res, 201, { ok: true, id: note.id, file: `${base}.md` }, cors)
+    } finally {
+      inflight.delete(key)
+    }
   }
 }
 

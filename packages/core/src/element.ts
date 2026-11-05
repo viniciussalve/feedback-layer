@@ -399,6 +399,11 @@ export class FeedbackLayerElement extends HTMLElement {
     this.fab.addEventListener('pointerdown', (e) => {
       if (e.button !== 0) return
       this.drag = { id: e.pointerId, sx: e.clientX, sy: e.clientY, moved: false }
+      try {
+        this.fab.setPointerCapture(e.pointerId) // sem isso o mouse sai do botão e perde os pointermove
+      } catch {
+        // pointer sintético ou já encerrado
+      }
     })
     this.fab.addEventListener('pointermove', (e) => this.onDragMove(e))
     this.fab.addEventListener('pointerup', (e) => this.onDragEnd(e))
@@ -546,7 +551,6 @@ export class FeedbackLayerElement extends HTMLElement {
       if (Math.hypot(e.clientX - d.sx, e.clientY - d.sy) <= DRAG_THRESHOLD) return
       d.moved = true
       this.setPanel(false, false)
-      this.fab.setPointerCapture(e.pointerId)
       this.dock.style.removeProperty('--fl-lift')
       this.dock.dataset.dragging = 'true'
     }

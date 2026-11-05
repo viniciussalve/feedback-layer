@@ -22,7 +22,7 @@ button { cursor: pointer; }
 svg { width: ${v('icon')}; height: ${v('icon')}; flex: none; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
 svg.sm { width: ${v('icon-sm')}; height: ${v('icon-sm')}; }
 
-.root { position: fixed; inset: 0; pointer-events: none; z-index: ${v('z')}; font-size: ${v('t-body')}; line-height: 1.4; color: ${v('fg')}; }
+.root { all: initial; display: block; position: fixed; inset: 0; font-family: ${v('font-sans')}; font-weight: 400; letter-spacing: normal; text-transform: none; text-align: start; direction: ltr; pointer-events: none; z-index: ${v('z')}; font-size: ${v('t-body')}; line-height: 1.4; color: ${v('fg')}; }
 .root > * { pointer-events: auto; }
 .root > .hl, .root > .chip, .root > .live { pointer-events: none; }
 .root.off > :not(.live) { display: none !important; }

@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="pt-BR" data-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Feedback Layer: exemplo HTML puro</title>
+    <!--
+      Página de teste do e2e. O CSS abaixo é de propósito agressivo: se algo vazasse para dentro do
+      Shadow DOM do <feedback-layer>, o botão e o popover ficariam vermelhos, em Comic Sans, com bordas gigantes.
+    -->
+    <style>
+      :root, [data-theme='dark'] { --bg: #151517; --fg: #f9fafb; --surface: #232325; --border: #f9fafb1a; --accent: #a855f7; }
+      [data-theme='light'] { --bg: #ffffff; --fg: #151517; --surface: #f1f3f5; --border: #15151720; --accent: #7e22ce; }
+      body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.5 system-ui, sans-serif; }
+      main { max-width: 52rem; margin: 0 auto; padding: 1rem; display: grid; gap: 1rem; }
+      #panel { height: 12rem; overflow: auto; border: 1px solid var(--border); padding: 0.5rem; }
+      #panel li { padding: 0.5rem; border-bottom: 1px solid var(--border); }
+      fieldset { border: 1px solid var(--border); padding: 0.75rem; display: grid; gap: 0.5rem; }
+
+      /* ---- agressivo ----
+         Regras globais e por tag, com !important, mirando tudo que o Shadow DOM da camada usa
+         (e também o próprio <feedback-layer>, de onde as propriedades herdadas entram no shadow). */
+      * { font-family: 'Comic Sans MS', cursive !important; letter-spacing: 3px !important; text-transform: uppercase !important; word-spacing: 9px !important; line-height: 2.2 !important; }
+      feedback-layer { color: red !important; font-size: 31px !important; text-align: right !important; font-style: italic !important; font-weight: 900 !important; direction: rtl !important; visibility: visible !important; cursor: wait !important; }
+      button, input, textarea, select, summary, label, details, pre, fieldset, legend, p, h2, span {
+        color: red !important;
+        background: red !important;
+        border: 9px dashed lime !important;
+        border-radius: 0 !important;
+        padding: 20px !important;
+        margin: 20px !important;
+        outline: 5px solid yellow !important;
+        box-shadow: none !important;
+        font-size: 31px !important;
+        opacity: 0.9 !important;
+      }
+      svg { display: none !important; width: 0 !important; }
+      summary, pre, details, legend, h2 { transform: rotate(3deg) !important; }
+      *::before, *::after { content: 'LEAK' !important; }
+      :focus-visible, :focus { outline: none !important; }
+      /* o resto da página precisa seguir legível e rolável */
+      body, main, #intro, #panel, #panel li { background: var(--bg) !important; color: var(--fg) !important; border: 0 !important; padding: 0 !important; margin: 0 !important; font-size: 16px !important; line-height: 1.5 !important; text-transform: none !important; letter-spacing: normal !important; word-spacing: normal !important; font-family: system-ui, sans-serif !important; }
+      main { padding: 1rem !important; overflow-x: clip !important; }
+      h1, #intro, label { font-size: 1rem !important; overflow-wrap: anywhere; }
+      #panel { height: 12rem !important; overflow: auto !important; border: 1px solid var(--border) !important; padding: 0.5rem !important; list-style: none; }
+      #panel li { padding: 0.5rem !important; border-bottom: 1px solid var(--border) !important; }
+      input, textarea, select, button { max-width: 100% !important; }
+
+      /* barra fixa do host: usada para o teste de desvio automático (?dodge=1) */
+      #bar { position: fixed; right: 0.5rem; bottom: 0.5rem; z-index: 50; width: 12rem !important; height: 7.5rem !important; padding: 0 !important; margin: 0 !important; background: #0a7 !important; color: #fff !important; border: 0 !important; transform: none !important; display: none; }
+      body.dodge #bar { display: block; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1 id="title">Exemplo HTML puro</h1>
+      <p class="host-box" id="intro">Página de teste do Feedback Layer, com CSS agressivo de propósito.</p>
+      <button id="buy" type="button">Comprar agora</button>
+
+      <form id="signup" data-testid="signup" onsubmit="return false">
+        <fieldset>
+          <legend>Cadastro</legend>
+          <label>E-mail <input id="email" type="email" value="ana@exemplo.com" /></label>
+          <label>Senha <input id="pw" type="password" value="hunter2-senha" /></label>
+          <label>Bio <textarea id="bio">segredo-do-textarea</textarea></label>
+          <label>Plano
+            <select id="plan"><option selected>opcao-secreta</option></select>
+          </label>
+          <div id="editable" contenteditable="true">texto-editavel-privado</div>
+          <div id="ignored" data-feedback-ignore><span id="ignored-inner">conteudo-ignorado</span></div>
+          <button type="submit" id="submit">Criar conta</button>
+        </fieldset>
+      </form>
+
+      <ul id="panel" aria-label="Lista rolável"></ul>
+
+      <section id="tail"><p id="last">Último parágrafo da página.</p></section>
+    </main>
+    <div id="bar" role="status">Chat do host</div>
+
+    <script>
+      const ul = document.getElementById('panel')
+      for (let i = 1; i <= 40; i++) {
+        const li = document.createElement('li')
+        li.id = 'item-' + i
+        li.textContent = 'Item ' + i
+        ul.appendChild(li)
+      }
+      const params = new URLSearchParams(location.search)
+      if (params.get('theme') === 'light') document.documentElement.setAttribute('data-theme', 'light')
+      if (params.has('dodge')) document.body.classList.add('dodge')
+      // Erro de console proposital: entra na nota.
+      addEventListener('load', () => console.error('Falha de exemplo: x is undefined'))
+    </script>
+    <script
+      src="../../packages/core/dist/feedback-layer.iife.js"
+      data-project="plain-html-example"
+      data-version="0.0.0"
+      data-from="vini"
+      data-to="plain-html-example"
+      data-bridge="http://127.0.0.1:7777"
+    ></script>
+  </body>
+</html>
