@@ -55,6 +55,7 @@ try {
         await page.goto(BASE + route)
         await page.evaluate((t) => (document.documentElement.dataset.theme = t), theme)
         await page.locator('.fab').waitFor({ state: 'visible' })
+        await page.waitForTimeout(1500) // o DS anima cores ao trocar o tema (~1 s): espera terminar antes do screenshot
         const attr = await page.evaluate(() => document.documentElement.getAttribute('data-feedback-layer'))
         assert.equal(attr, 'visible', `${route} ${vp.n} ${theme}: atributo no <html>`)
         const tail = await page.evaluate(() => {
