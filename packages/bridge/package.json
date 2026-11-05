@@ -1,0 +1,19 @@
+{
+  "name": "@feedback-layer/bridge",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "./dist/server.js",
+  "types": "./dist/server.d.ts",
+  "bin": { "feedback-bridge": "./dist/cli.js" },
+  "exports": { ".": { "types": "./dist/server.d.ts", "import": "./dist/server.js" } },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "start": "node dist/cli.js"
+  },
+  "dependencies": {
+    "@feedback-layer/core": "0.1.0"
+  }
+}

@@ -1,0 +1,8 @@
+node_modules
+dist
+*.local
+.DS_Store
+inbox/
+e2e/screenshots/
+e2e/.tmp/
+test-results/
