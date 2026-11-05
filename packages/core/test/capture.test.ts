@@ -1,7 +1,9 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it } from 'vitest'
 import { buildNote } from '../src/build.js'
-import { captureTarget, isSensitive, safeText, selectorFor } from '../src/capture.js'
+import {
+  captureTarget, clearConsoleErrors, getConsoleErrors, installConsoleCapture, isSensitive, safeText, selectorFor,
+} from '../src/capture.js'
 import { toJSON, toMarkdown } from '../src/markdown.js'
 import { validateNote } from '../src/schema.js'
 
@@ -89,5 +91,21 @@ describe('privacidade da captura', () => {
     expect(md.trimEnd().split('\n').pop()).toBe(`<!-- feedback-note:v1 id=${note.id} -->`)
     expect(md).not.toMatch(/[\u202A-\u202E\u2066-\u2069]/)
     expect(validateNote(JSON.parse(toJSON(note))).ok).toBe(true)
+  })
+
+  it('console: a mensagem entra no buffer com no máximo 2000 caracteres', () => {
+    clearConsoleErrors()
+    installConsoleCapture()
+    const orig = console.error
+    try {
+      console.error('-'.repeat(40_000))
+      console.error({ big: '_'.repeat(40_000) })
+      window.dispatchEvent(new ErrorEvent('error', { message: 'x'.repeat(40_000) }))
+    } finally {
+      console.error = orig
+    }
+    const msgs = getConsoleErrors().map((e) => e.message)
+    expect(msgs.length).toBeGreaterThanOrEqual(2)
+    for (const m of msgs) expect(m.length).toBeLessThanOrEqual(2000)
   })
 })

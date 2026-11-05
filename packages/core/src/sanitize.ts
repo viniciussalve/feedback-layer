@@ -15,20 +15,23 @@ import {
 
 const s = (v: unknown): string => (typeof v === 'string' ? v : '')
 
+/** Entrada limitada a 2x o máximo antes de qualquer regex: o custo da redação não cresce com o tamanho da entrada. */
+const capped = (v: unknown, max: number): string => truncate(s(v), max * 2)
+
 /** Uma linha, sem redação de e-mail: from, to, project.*, vue.*. */
 const line = (v: unknown, max: number) =>
-  fixpoint(s(v), (x) => truncate(stripMarkers(oneLine(x)), max).trim())
+  fixpoint(capped(v, max), (x) => truncate(stripMarkers(oneLine(x)), max).trim())
 
 /** Uma linha com redação completa: url, route, title, text, selector, erros. */
 const redLine = (v: unknown, max: number, pre: (x: string) => string = (x) => x, red = redact) =>
-  fixpoint(s(v), (x) => truncate(stripMarkers(red(pre(oneLine(x)))), max).trim())
+  fixpoint(capped(v, max), (x) => truncate(stripMarkers(red(pre(oneLine(x)))), max).trim())
 
 const style = (v: unknown) =>
-  fixpoint(s(v), (x) => truncate(stripMarkers(maskCssUrls(oneLine(x))), LIMITS.style).trim())
+  fixpoint(capped(v, LIMITS.style), (x) => truncate(stripMarkers(maskCssUrls(oneLine(x))), LIMITS.style).trim())
 
 function sanitizeComment(v: unknown): string {
   // só segredos: e-mail e texto comum ficam, o usuário os escreve de propósito
-  return fixpoint(s(v), (x) => truncate(stripMarkers(redactSecrets(multiLine(x))), LIMITS.comment).trim())
+  return fixpoint(capped(v, LIMITS.comment), (x) => truncate(stripMarkers(redactSecrets(multiLine(x))), LIMITS.comment).trim())
 }
 
 const finiteInt = (v: unknown, min: number) =>

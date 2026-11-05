@@ -8,9 +8,11 @@ const BEARER_RE = /\bBearer\s+[A-Za-z0-9._~+/=-]+/gi
 
 // --- chave/valor ---------------------------------------------------------------------------------
 // Nomes sensíveis casados como SUFIXO (access_token, client_secret, dbPassword) ou como nome exato.
-const NAME_SUFFIX = 'token|secret|password|passwd|pwd|api[_-]?key|apikey|access[_-]?key|private[_-]?key|credentials?'
-const NAME_EXACT = 'authorization|auth|session|session[_-]?id|sessionid|sid|cookie|set-cookie'
-const NAME = `(?<![A-Za-z0-9])((?:[A-Za-z0-9_.-]*(?:${NAME_SUFFIX})|${NAME_EXACT}))`
+const NAME_SUFFIX = 'token|secret|password|passwd|pwd|senha|segredo|api[_-]?key|apikey|access[_-]?key|private[_-]?key|credentials?'
+// `pass` e `chave` só como nome inteiro (não pegam `compass` nem `chaveiro`)
+const NAME_EXACT = 'authorization|auth|session|session[_-]?id|sessionid|sid|cookie|set-cookie|pass|chave'
+// Prefixo limitado a 48 caracteres: sem isso, uma sequência longa de `-`/`_` custa tempo quadrático.
+const NAME = `(?<![A-Za-z0-9])((?:[A-Za-z0-9_.-]{0,48}(?:${NAME_SUFFIX})|${NAME_EXACT}))`
 const QUOTE = '(?:\\\\?["\'])'
 // valor: entre aspas (inclusive escapadas, de JSON dentro de string) ou até espaço, & , ; aspas ou }
 const VAL_QUOTED = '"(?:[^"\\\\]|\\\\.)*"|\'[^\']*\'|\\\\"[^"\\\\]*\\\\"'
@@ -24,12 +26,15 @@ const AUTH_HDR_RE = new RegExp(
   `(?<![A-Za-z0-9])((?:proxy-)?authorization)(${QUOTE}?[ \\t]*[:=][ \\t]*)(?!(?:${SCHEME}[ \\t]+)?\\[redacted\\])(${SCHEME}[ \\t]+)?[^\\s&,;"'}]+`,
   'gi',
 )
+// `cookie` e `set-cookie`: o valor vai até o fim da linha (`Cookie: a=1; b=2` inteiro)
+const COOKIE_EQ_RE = new RegExp(`(?<![A-Za-z0-9])((?:set-)?cookie)(${QUOTE}?[ \\t]*=[ \\t]*)[^\\n]+`, 'gi')
+const COOKIE_COLON_RE = new RegExp(`(?<![A-Za-z0-9])((?:set-)?cookie)(${QUOTE}?[ \\t]*:[ \\t]*)[^\\n]+`, 'gi')
 // `code` (OAuth) só onde `comment` não chega: console e query string
 const CODE_RE = new RegExp(`(?<![A-Za-z0-9_.-])(code)(${QUOTE}?[ \\t]*[=:][ \\t]*)(${VAL_QUOTED}|${VAL_BARE})`, 'gi')
 const QUERY_CODE_RE = /([?&]code=)[^&\s#]+/gi
-const URL_CREDS_RE = /\b([a-z][a-z0-9+.-]*:\/\/)[^\s/@:?#]+:[^\s/@]+@/gi
+const URL_CREDS_RE = /(?<![a-z0-9+.-])([a-z][a-z0-9+.-]{0,31}:\/\/)[^\s/@:?#]+:[^\s/@]+@/gi
 const KNOWN_KEY_RE =
-  /\b(?:sk-[A-Za-z0-9_-]{8,}|gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|xox[abprs]-[A-Za-z0-9-]{8,}|AKIA[0-9A-Z]{16}|AIza[0-9A-Za-z_-]{30,})/g
+  /\b(?:sk-[A-Za-z0-9_-]{8,}|[sr]k_(?:live|test)_[A-Za-z0-9]{8,}|gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|xox[abprs]-[A-Za-z0-9-]{8,}|AKIA[0-9A-Z]{16}|AIza[0-9A-Za-z_-]{30,})/g
 const CARD_RE = /(?<!\d)\d(?:[ -]?\d){12,18}(?!\d)/g
 
 const hideValue = (v: string): string =>
@@ -58,8 +63,8 @@ function redactCards(s: string): string {
 
 const HEX_RE = /\b[0-9a-fA-F]{32,}\b/g
 // sequência longa com letras e dígitos (base64url, chaves de API)
-const LONG_TOKEN_RE = /(?=[A-Za-z0-9_-]*\d)(?=[A-Za-z0-9_-]*[A-Za-z])[A-Za-z0-9_-]{32,}/g
-const EMAIL_RE = /[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}/g
+const LONG_TOKEN_RE = /(?<![A-Za-z0-9_-])(?=[A-Za-z0-9_-]*\d)(?=[A-Za-z0-9_-]*[A-Za-z])[A-Za-z0-9_-]{32,}/g
+const EMAIL_RE = /(?<![A-Za-z0-9._%+-])[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}/g
 
 const CONTROL_ALL = /[\u0000-\u001F\u007F-\u009F]/g
 const CONTROL_KEEP_NL = /[\u0000-\u0009\u000B-\u001F\u007F-\u009F]/g
@@ -84,9 +89,11 @@ function scrub(s: string, mode: Mode): string {
     .replace(AUTH_HDR_RE, (_m, name: string, sep: string, scheme?: string) => `${name}${sep}${scheme ?? ''}[redacted]`)
     .replace(BEARER_RE, 'Bearer [redacted]')
     .replace(URL_CREDS_RE, '$1[redacted]@')
+    .replace(COOKIE_EQ_RE, '$1$2[redacted]')
     .replace(EQ_RE, kv)
     .replace(JSON_RE, kv)
-  if (mode !== 'comment') out = out.replace(COLON_RE, kv).replace(QUERY_CODE_RE, '$1[redacted]')
+  if (mode !== 'comment') out = out.replace(COOKIE_COLON_RE, '$1$2[redacted]').replace(COLON_RE, kv)
+  if (mode !== 'comment') out = out.replace(QUERY_CODE_RE, '$1[redacted]')
   if (mode === 'console') out = out.replace(CODE_RE, kv)
   return redactCards(out.replace(KNOWN_KEY_RE, '[token]'))
     .replace(HEX_RE, '[token]')
@@ -97,7 +104,8 @@ function scrub(s: string, mode: Mode): string {
  * Só segredos, para o `comment`: JWT, Bearer, `Authorization: <esquema> <valor>`, `chave=valor` e JSON entre aspas,
  * credenciais em URL, chaves conhecidas, cartão (Luhn), hex e sequências longas.
  * Não casa `chave: valor` solto nem `code` ("senha: obrigatória" e "code=200" são texto comum).
- * É melhor esforço: não garante que nenhum segredo passe.
+ * É melhor esforço: não garante que nenhum segredo passe. NÃO cobertos (decisão da v1): valores em array
+ * (`password:["a"]`), `Authorization: Digest username="x", response="abc"` e URL com usuário vazio (`redis://:senha@host`).
  */
 export function redactSecrets(s: string): string {
   return scrub(s, 'comment')

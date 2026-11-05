@@ -18,18 +18,20 @@ const BUFFER_MAX = 10
 const buffer: ConsoleEntry[] = []
 let installed = false
 
+const MESSAGE_MAX = 2000 // um erro gigante não entra inteiro no buffer (a nota guarda 300 de qualquer jeito)
+
 function push(message: string) {
-  buffer.push({ ts: new Date().toISOString(), message })
+  buffer.push({ ts: new Date().toISOString(), message: message.length > MESSAGE_MAX ? message.slice(0, MESSAGE_MAX) : message })
   while (buffer.length > BUFFER_MAX) buffer.shift()
 }
 
 function describe(arg: unknown): string {
   if (arg instanceof Error) return `${arg.name}: ${arg.message}`
-  if (typeof arg === 'string') return arg
+  if (typeof arg === 'string') return arg.slice(0, MESSAGE_MAX)
   try {
-    return JSON.stringify(arg) ?? String(arg)
+    return (JSON.stringify(arg) ?? String(arg)).slice(0, MESSAGE_MAX)
   } catch {
-    return String(arg)
+    return String(arg).slice(0, MESSAGE_MAX)
   }
 }
 
