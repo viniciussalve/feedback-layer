@@ -1,97 +1,111 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { COLORS_DARK, COLORS_LIGHT, SHARED } from '../src/fallback-tokens.js'
+import { COLORS_DARK, COLORS_LIGHT, NARROW_MAX, OWN, SHARED, tokensCss } from '../src/fallback-tokens.js'
 
 /**
- * Compara `fallback-tokens.ts` com uma cópia versionada do `tokens.css` do design-system-vue.
- * Ao atualizar o DS: copie o novo `tokens.css` para `fixtures/`, ajuste o nome e o import abaixo
- * e atualize `fallback-tokens.ts`.
+ * Forma do espelho gerado (`fallback-tokens.generated.ts`). Os VALORES vêm do `tokens.css` do design-system-vue
+ * pelo gerador (`npm run tokens` lá; `npm run tokens:check` confere). Aqui só se garante que o arquivo tem o
+ * formato que a lib espera, para uma geração quebrada não passar em silêncio.
  */
-const css = readFileSync(join(__dirname, 'fixtures', 'ds-tokens-47ab4eb.css'), 'utf8')
 
-type Vars = Record<string, string>
+const COLOR_KEYS = [
+  'accent', 'accent-fg', 'accent-hover', 'bg', 'bg-raised', 'border', 'danger', 'fg', 'fg-muted',
+  'fg-subtle', 'focus-ring', 'mark', 'mark-fg', 'success', 'surface', 'surface-2',
+]
+const SHARED_KEYS = [
+  'floating', 'font-mono', 'font-sans', 'group', 'inner', 'inner-sm', 'r-card', 'r-control', 'r-pill',
+  't-body', 't-body-lg', 't-caption', 't-title', 'touch',
+]
+const HEX = /^#[0-9a-f]{6}([0-9a-f]{2})?$/
+const REM = /^\d+(\.\d+)?rem$/
 
-/** Blocos `seletor { --a: b; }` sem aninhamento (os blocos de tokens do DS são planos). */
-function blocks(source: string): Array<{ selector: string; vars: Vars }> {
-  const clean = source.replace(/\/\*[\s\S]*?\*\//g, '')
-  const out: Array<{ selector: string; vars: Vars }> = []
-  for (const m of clean.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
-    const vars: Vars = {}
-    for (const d of m[2].matchAll(/(--[\w-]+)\s*:\s*([^;]+);/g)) vars[d[1].slice(2)] = d[2].trim()
-    if (Object.keys(vars).length) out.push({ selector: m[1].trim(), vars })
-  }
-  return out
-}
+describe('fallback-tokens (espelho gerado)', () => {
+  it('dark e light têm as mesmas chaves, as esperadas pela lib', () => {
+    expect(Object.keys(COLORS_DARK).sort()).toEqual(COLOR_KEYS)
+    expect(Object.keys(COLORS_LIGHT).sort()).toEqual(COLOR_KEYS)
+  })
 
-const all = blocks(css)
-const pick = (test: (selector: string) => boolean): Vars =>
-  Object.assign({}, ...all.filter((b) => test(b.selector)).map((b) => b.vars))
-
-const rootVars = pick((s) => s.startsWith(':root'))
-const lightVars = pick((s) => s === "[data-theme='light']")
-const themeVars = pick((s) => s === '@theme')
-const floatingVisible = pick((s) => s === "html[data-feedback-layer='visible']")
-
-function resolve(name: string, vars: Vars): string {
-  let v = vars[name]
-  if (v === undefined) throw new Error(`token --${name} ausente no tokens.css`)
-  for (let i = 0; i < 5; i++) {
-    const m = v.match(/^var\(--([\w-]+)\)$/)
-    if (!m) return v.toLowerCase()
-    v = vars[m[1]]
-    if (v === undefined) throw new Error(`token --${m[1]} ausente no tokens.css`)
-  }
-  throw new Error(`var() em ciclo em --${name}`)
-}
-
-const darkAll: Vars = { ...rootVars }
-const lightAll: Vars = { ...rootVars, ...lightVars }
-const sharedAll: Vars = { ...themeVars, ...floatingVisible }
-
-describe('fallback-tokens espelha o tokens.css do DS', () => {
-  for (const [name, value] of Object.entries<string>(COLORS_DARK)) {
-    it(`dark --${name}`, () => {
-      expect(value.toLowerCase()).toBe(resolve(name, darkAll))
-    })
-  }
-
-  for (const [name, value] of Object.entries<string>(COLORS_LIGHT)) {
-    it(`light --${name}`, () => {
-      expect(value.toLowerCase()).toBe(resolve(name, lightAll))
-    })
-  }
-
-  for (const [name, t] of Object.entries(SHARED)) {
-    // `--spacing-floating`: o DS usa 6.5rem sem o layer e 9rem com ele visível (o fixture traz os dois).
-    it(`compartilhado --fl-${name} (--${t.host})`, () => {
-      expect(t.value.toLowerCase()).toBe(resolve(t.host, sharedAll))
-    })
-  }
-
-  it('o acento é #F5C518 nos dois temas e o texto sobre ele é escuro', () => {
+  it('toda cor é hex minúsculo (#rrggbb ou #rrggbbaa), sem var()', () => {
     for (const set of [COLORS_DARK, COLORS_LIGHT]) {
-      expect(set.accent).toBe('#f5c518')
-      expect(set['accent-fg']).toBe('#151517')
+      for (const [name, value] of Object.entries<string>(set)) expect(value, name).toMatch(HEX)
     }
   })
 
-  it('todo token do DS é espelhado ou está na lista de exceções', () => {
-    const mirrored = new Set<string>([
-      ...Object.keys(COLORS_DARK),
-      ...Object.values(SHARED).map((t) => t.host),
-    ])
-    const notMirrored = [...new Set([...Object.keys(rootVars), ...Object.keys(lightVars), ...Object.keys(themeVars)])]
-      .filter((n) => !mirrored.has(n))
-      .sort()
-    // Novo token no DS? Espelhe em fallback-tokens.ts ou inclua aqui de propósito.
-    // Escala accent-50…900 e text-micro/heading/display/placeholder: o layer não usa.
-    expect(notMirrored).toEqual(
-      [
-        'accent-50', 'accent-100', 'accent-200', 'accent-300', 'accent-400',
-        'accent-500', 'accent-600', 'accent-700', 'accent-800', 'accent-900',
-        'placeholder', 'text-display', 'text-heading', 'text-micro',
-      ].sort(),
-    )
+  it('o texto sobre o acento e o acento nunca são o mesmo valor', () => {
+    for (const set of [COLORS_DARK, COLORS_LIGHT]) expect(set['accent-fg']).not.toBe(set.accent)
+  })
+
+  it('compartilhados: chaves esperadas, host único e valores no formato rem/px/lista de fontes', () => {
+    expect(Object.keys(SHARED).sort()).toEqual(SHARED_KEYS)
+    const hosts = Object.values(SHARED).map((t) => t.host)
+    expect(new Set(hosts).size).toBe(hosts.length)
+    for (const [name, t] of Object.entries(SHARED)) {
+      expect(t.host, name).toMatch(/^[a-z][a-z0-9-]*$/)
+      if (name.startsWith('font-')) expect(t.value, name).toMatch(/,/)
+      else if (name === 'r-pill') expect(t.value, name).toMatch(/^\d+px$/)
+      else expect(t.value, name).toMatch(REM)
+    }
+  })
+
+  it('o gerado tem o cabeçalho "NÃO EDITE" e o sha256 do tokens.css', () => {
+    const src = readFileSync(join(__dirname, '..', 'src', 'fallback-tokens.generated.ts'), 'utf8')
+    expect(src).toMatch(/GERADO por design-system-vue\/scripts\/tokens\.mjs/)
+    expect(src).toMatch(/sha256 do tokens\.css .*: [0-9a-f]{64}/)
+  })
+
+  // Contraste calculado dos próprios hex do arquivo gerado (WCAG 2.x, sRGB). Não depende do DS: uma edição à mão
+  // que quebre o acento, o hover ou o foco falha aqui, no CI do próprio feedback-layer.
+  describe('contraste (mínimos iguais aos do gerador do DS)', () => {
+    const lin = (c: number) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4)
+    const lum = (hex: string) => {
+      const [r, g, b] = [1, 3, 5].map((i) => lin(parseInt(hex.slice(i, i + 2), 16) / 255))
+      return 0.2126 * r + 0.7152 * g + 0.0722 * b
+    }
+    const ratio = (a: string, b: string) => {
+      const x = lum(a), y = lum(b)
+      return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05)
+    }
+    const FG_ON_ACCENT_MIN = 4.5
+    const FOCUS_MIN = 3
+    const SURFACES = ['bg', 'bg-raised', 'surface', 'surface-2'] as const
+    const themes: Array<[string, Record<string, string>]> = [
+      ['dark', COLORS_DARK],
+      ['light', COLORS_LIGHT],
+    ]
+
+    it('o cálculo reproduz valores conhecidos (guarda do próprio teste)', () => {
+      expect(ratio('#000000', '#ffffff')).toBeCloseTo(21, 5)
+      expect(ratio('#ffffff', '#ffffff')).toBeCloseTo(1, 5)
+      expect(ratio('#f5c518', '#151517')).toBeCloseTo(11.19, 1)
+    })
+
+    for (const [theme, set] of themes) {
+      it(`${theme}: accent-fg × accent >= ${FG_ON_ACCENT_MIN}`, () => {
+        expect(ratio(set['accent-fg'], set.accent)).toBeGreaterThanOrEqual(FG_ON_ACCENT_MIN)
+      })
+      it(`${theme}: accent-fg × accent-hover >= ${FG_ON_ACCENT_MIN}`, () => {
+        expect(ratio(set['accent-fg'], set['accent-hover'])).toBeGreaterThanOrEqual(FG_ON_ACCENT_MIN)
+      })
+      for (const surface of SURFACES) {
+        it(`${theme}: focus-ring × ${surface} >= ${FOCUS_MIN}`, () => {
+          expect(ratio(set['focus-ring'], set[surface])).toBeGreaterThanOrEqual(FOCUS_MIN)
+        })
+      }
+    }
+  })
+
+  it('tokensCss() emite as quatro regras do :host com var() do host e fallback', () => {
+    const css = tokensCss()
+    expect(css).toContain(`--fl-bg: var(--bg, ${COLORS_DARK.bg});`)
+    expect(css).toContain(`--fl-bg: var(--bg, ${COLORS_LIGHT.bg});`)
+    expect(css).toContain(`--fl-inner: var(--${SHARED.inner.host}, ${SHARED.inner.value});`)
+    expect(css).toContain(`:host([isolate-tokens]) { --fl-bg: ${COLORS_DARK.bg};`)
+    expect(css.match(/^:host/gm)).toHaveLength(4)
+  })
+
+  it('tokens próprios e largura estreita seguem definidos', () => {
+    expect(OWN.z).toBeTruthy()
+    expect(NARROW_MAX).toBeGreaterThan(0)
   })
 })
