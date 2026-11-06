@@ -1,6 +1,6 @@
 /**
  * GERADO por design-system-vue/scripts/tokens.mjs a partir de src/styles/tokens.css. NÃO EDITE À MÃO.
- * sha256 do tokens.css (quebras de linha LF): d01990f16b79a51f020e021a4052c9d27d2b7dd08cb3005e9e2dfdc27b6fdee8
+ * sha256 do tokens.css (quebras de linha LF): adff974b205c8d8ff74c07a35dbfa3d8b76172020533d23dea98f8fdacb37592
  * Para mudar um valor: edite tokens.config.json (ou o tokens.css, nas partes à mão) no design-system-vue,
  * rode `npm run tokens` lá e commite os dois repositórios com o mesmo nome de branch. Merge: feedback-layer primeiro.
  * Cores resolvidas (var() expandido), tema dark = `:root`, light = `[data-theme='light']`; compartilhados = `@theme`.
